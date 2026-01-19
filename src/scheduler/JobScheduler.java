@@ -1,130 +1,136 @@
 package scheduler;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.PriorityBlockingQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
-public class JobScheduler{
-  /**
-   * @param args
-   * @throws InterruptedException
-   */
-  public static void main(String[]args) throws InterruptedException{
-    System.out.println("---Testing Job Scheduler---");
 
-    //Creating scheduler
-    System.out.println("Creating scheduler with 3 workers");
-    Scheduler scheduler = new Scheduler(3);
-    System.out.println("Scheduler created successfully");
-    System.out.println("Status: " + scheduler.getStatus() + "\n");
-    Thread.sleep(500);
-
-    //Submitting the job
-    System.out.println("\n Submitting Jobs");
-
-    scheduler.submitJob("Job 1", 5, ()->{
-      System.out.println("Job 1 is executing");
-      try{
-        Thread.sleep(500);
-      }
-      catch(InterruptedException e)
-      {
+public class JobScheduler {
+    
+    private final BlockingQueue<Job> jobQueue;
+    private final List<Thread> workerThreads;
+    private final List<Worker> workers;
+    private final int poolSize;
+    private final AtomicBoolean isShutdown;
+    
+  
+    public JobScheduler(int poolSize) {
+        if (poolSize <= 0) {
+            throw new IllegalArgumentException("Pool size must be positive");
+        }
         
-      }
-    });
-
-    scheduler.submitJob("Job 2", 10, ()->{
-      System.out.println("Job 2 is executing");
-      try
-      {
-        Thread.sleep(500);
-      }
-      catch(InterruptedException e)
-      {
-
-      }
-    });
-
-    scheduler.submitJob("Job 3", 12, ()->{
-      System.out.println("Job 3 is executing");
-      try
-      {
-        Thread.sleep(500);
-      }
-      catch(InterruptedException e)
-      {
-
-      }
-    });
-
-    System.out.println("Jobs Submitted Successfully");
-
-    // Checking Concurrency
-    System.out.println("\nTesting concurrent execution");
-    System.out.println("Submitting 6 jobs to 3 workers");
-
-    for(int i=1;i<=6;i++)
-    {
-      final int jobNum = i;
-      scheduler.submitJob("Job" + i, 5, ()->{
-        System.out.println("Job " + jobNum + " Start on "+ Thread.currentThread().getName());
-        try
-        {
-          Thread.sleep(500);
+        this.poolSize = poolSize;
+        this.jobQueue = new PriorityBlockingQueue<>();
+        this.workerThreads = new ArrayList<>();
+        this.workers = new ArrayList<>();
+        this.isShutdown = new AtomicBoolean(false);
+        
+        initializeWorkers();
+    }
+    
+    
+    private void initializeWorkers() {
+        for (int i = 0; i < poolSize; i++) {
+            Worker worker = new Worker(jobQueue, "Worker-" + (i + 1));
+            Thread thread = new Thread(worker);
+            thread.setName("Worker-" + (i + 1));
+            
+            workers.add(worker);
+            workerThreads.add(thread);
+            thread.start();
         }
-        catch(InterruptedException e)
-        {
-
+        
+        System.out.println(String.format("JobScheduler initialized with %d workers", poolSize));
+    }
+    
+   
+    public void submitJob(Job job) {
+        if (isShutdown.get()) {
+            throw new IllegalStateException("Cannot submit job - scheduler is shutdown");
         }
-      });
+        
+        jobQueue.offer(job);
+        System.out.println(String.format("Job submitted: %s (Queue size: %d)", job, jobQueue.size()));
     }
-    Thread.sleep(3000);
-
-    //Status checking
-    System.out.println("\n Checking status");
-    System.out.println("Status: " + scheduler.getStatus());
-    System.out.println("Pool size: " + scheduler.getPoolSize());
-    System.out.println("Pending Jobs : " + scheduler.pendingJobs());
-    System.out.println("Status checked");
-
-    //Testing normal shutdown
-    System.out.println("\nTesting graceful shutdown");
-    scheduler.submitJob("Final Job", 13, ()->{
-      System.out.println("Final job is executing");
-      try
-      {
-        Thread.sleep(500);
-      }
-      catch(InterruptedException e)
-      {
-
-      }
-    });
-    Thread.sleep(100);
-    scheduler.shutdown();
-
-    boolean terminated = scheduler.awaitTermination(5, TimeUnit.SECONDS);
-
-    if(terminated)
-    {
-      System.out.println("Terminated Successfully");
+    
+    
+    public void submitJob(String name, int priority, Runnable task) {
+        submitJob(new Job(name, priority, task));
     }
-    else
-    {
-      System.out.println("Termination timeout");
-    }
+    
+    public void shutdown() {
+        if (isShutdown.getAndSet(true)) {
+            System.out.println("Scheduler already shutdown");
+            return;
+        }
+        
+        System.out.println("Initiating scheduler shutdown...");
+        
 
-    //Condition after shutdown
-    System.out.println("\nVerifying shutdown");
-    System.out.println("Final status: " + scheduler.getStatus());
-
-    try{
-      scheduler.submitJob("Fail Job",1, ()->{});
-        System.out.println("Accepted a job after shutdown");
+        for (Worker worker : workers) {
+            worker.shutdown();
+        }
     }
-    catch(IllegalStateException e)
-    {
-      System.out.println("Rejected job after shutdown");
+    
+    public void shutdownNow() {
+        shutdown();
+        
+        System.out.println("Forcing immediate shutdown - interrupting workers...");
+        
+        for (Thread thread : workerThreads) {
+            thread.interrupt();
+        }
     }
-
-    System.out.println("\n All tests are successfull");
-  }
+    
+    
+    public boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedException {
+        long startTime = System.currentTimeMillis();
+        long timeoutMillis = unit.toMillis(timeout);
+        
+        for (Thread thread : workerThreads) {
+            long elapsed = System.currentTimeMillis() - startTime;
+            long remaining = timeoutMillis - elapsed;
+            
+            if (remaining <= 0) {
+                return false;
+            }
+            
+            thread.join(remaining);
+            
+            if (thread.isAlive()) {
+                return false;
+            }
+        }
+        
+        System.out.println("All workers terminated successfully");
+        return true;
+    }
+   
+    public int getPendingJobCount() {
+        return jobQueue.size();
+    }
+    
+    
+    public int getPoolSize() {
+        return poolSize;
+    }
+    
+    public boolean isShutdown() {
+        return isShutdown.get();
+    }
+    
+   
+    public String getStatus() {
+        int activeWorkers = (int) workerThreads.stream()
+                .filter(Thread::isAlive)
+                .count();
+        
+        return String.format(
+            "Scheduler{poolSize=%d, activeWorkers=%d, pendingJobs=%d, isShutdown=%s}",
+            poolSize, activeWorkers, getPendingJobCount(), isShutdown.get()
+        );
+    }
 }

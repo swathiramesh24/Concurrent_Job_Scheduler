@@ -1,9 +1,11 @@
-# Compiled Files 
-*.class 
-bin/ 
-out/ 
-target/ 
- 
-# IDE files 
-.idea/ 
-*.iml 
+# Ignore compiled Java files
+*.class
+
+# Ignore build folders
+bin/
+out/
+target/
+
+# Ignore IDE configs
+.vscode/
+.idea/
