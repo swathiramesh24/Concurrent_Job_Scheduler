@@ -43,24 +43,6 @@ Learning:
 
 ---
 
-## 🏗️ Architecture Overview
-SchedulerDemo
-|
-v
-Scheduler
-|
-v
-PriorityBlockingQueue<Job>
-|
-v
-Worker Threads
-|
-v
-Job.run()
-
-
----
-
 ## 🧩 Core Components
 
 ### Job
@@ -83,7 +65,7 @@ Job.run()
 
 ---
 
-## 🚀 Getting Started
+###  Getting Started
 
 ### Prerequisites
 - Java 11 or higher
@@ -92,36 +74,14 @@ Job.run()
 
 ---
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/swathiramesh24/Concurrent_Job_Scheduler.git
-cd Concurrent_Job_Scheduler
-Compile
+### Compile the Project
 javac -d bin src/**/*.java
 (or build using your IDE)
 
-Run
+### Run
 java -cp bin demo.SchedulerDemo
 
-### Creating a Job
-Job job = new Job(
-    "Sample Job",
-    5, // priority
-    () -> {
-        System.out.println("Job is running...");
-    }
-);
-
-### Scheduling a Job
-Scheduler scheduler = new Scheduler(3); // 3 worker threads
-scheduler.start();
-scheduler.submit(job);
-
-### Shutting Down the Scheduler
-scheduler.shutdown();
-
-###Demo Scenarios
+### Demo Scenarios
 
 The demo class demonstrates:
 Basic job execution
@@ -140,23 +100,6 @@ Thread-safe queue (PriorityBlockingQueue)
 
 Safe worker shutdown without abrupt interruption
 
-📂 Project Structure
-Concurrent_Job_Scheduler/
-│
-├── src/
-│   ├── scheduler/
-│   │   ├── Job.java
-│   │   ├── Scheduler.java
-│   │   └── Worker.java
-│   │
-│   └── demo/
-│       └── SchedulerDemo.java
-│
-├── bin/              # compiled files (ignored)
-├── README.md
-└── .gitignore
-
-
 ### Future Improvements
 Retry mechanism with backoff
 Delayed and periodic jobs
@@ -168,6 +111,12 @@ Job persistence
 Swathii Ramesh
 GitHub: https://github.com/swathiramesh24
 
+### Clone the Repository
 
+```bash
+git clone https://github.com/swathiramesh24/Concurrent_Job_Scheduler.git
+cd Concurrent_Job_Scheduler
+
+---
 ---
 
